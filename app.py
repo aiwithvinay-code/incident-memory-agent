@@ -6,10 +6,24 @@ from hindsight_client import Hindsight
 from openai import OpenAI
 
 load_dotenv()
-BANK = os.getenv("BANK_ID", "incident-bank")
-hs = Hindsight(base_url=os.getenv("HINDSIGHT_URL", "https://api.hindsight.vectorize.io"),
-               api_key=os.environ["HINDSIGHT_API_KEY"])
-llm = OpenAI(base_url="https://api.groq.com/openai/v1", api_key=os.environ["GROQ_API_KEY"])
+def get_secret(name, default=None):
+    v = os.getenv(name)
+    if v:
+        return v
+    try:
+        return st.secrets[name]
+    except Exception:
+        return default
+
+BANK = get_secret("BANK_ID", "incident-bank")
+HS_KEY = get_secret("HINDSIGHT_API_KEY")
+GROQ_KEY = get_secret("GROQ_API_KEY")
+if not HS_KEY or not GROQ_KEY:
+    st.error("Missing API keys. Add HINDSIGHT_API_KEY and GROQ_API_KEY in the app's Secrets settings.")
+    st.stop()
+
+hs = Hindsight(base_url=get_secret("HINDSIGHT_URL", "https://api.hindsight.vectorize.io"), api_key=HS_KEY)
+llm = OpenAI(base_url="https://api.groq.com/openai/v1", api_key=GROQ_KEY)
 MODELS = ["openai/gpt-oss-120b", "qwen/qwen3-32b"]
 
 SYSTEM = ("You are an on-call SRE assistant. Given a new incident and (optionally) memories of past "
