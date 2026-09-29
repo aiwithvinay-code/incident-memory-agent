@@ -1,11 +1,12 @@
 """Incident Response Agent with persistent memory (Hindsight). Run: streamlit run app.py"""
-import os, re, time, html
+import os, time, html
 import streamlit as st
 from dotenv import load_dotenv
 from hindsight_client import Hindsight
 from openai import OpenAI
 
 load_dotenv()
+
 def get_secret(name, default=None):
     v = os.getenv(name)
     if v:
@@ -15,11 +16,13 @@ def get_secret(name, default=None):
     except Exception:
         return default
 
+st.set_page_config(page_title="Incident Memory Agent", page_icon="🧠", layout="wide")
+
 BANK = get_secret("BANK_ID", "incident-bank")
 HS_KEY = get_secret("HINDSIGHT_API_KEY")
 GROQ_KEY = get_secret("GROQ_API_KEY")
 if not HS_KEY or not GROQ_KEY:
-    st.error("Missing API keys. Add HINDSIGHT_API_KEY and GROQ_API_KEY in the app's Secrets settings.")
+    st.error("Missing API keys. Add HINDSIGHT_API_KEY and GROQ_API_KEY in your .env file or the app's Secrets settings.")
     st.stop()
 
 hs = Hindsight(base_url=get_secret("HINDSIGHT_URL", "https://api.hindsight.vectorize.io"), api_key=HS_KEY)
@@ -38,18 +41,18 @@ EXAMPLES = {
     "Friday deploy errors": "checkout-service: spike of 500 errors right after a Friday 5pm deploy",
 }
 
-st.set_page_config(page_title="Incident Memory Agent", page_icon="🧠", layout="wide")
 st.markdown("""
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&display=swap');
 html, body, [class*="css"], .stApp { font-family: 'Figtree', sans-serif; }
+.stApp { background: #EEF1F6; color: #1B2433; }
 .block-container { padding-top: 2rem; max-width: 1200px; }
 h1 { font-weight: 700; letter-spacing: -0.02em; margin-bottom: 0; }
 .sub { color: #5B6675; margin: 0 0 1.2rem 0; font-size: 1.05rem; }
-.stat { background:#fff; border-radius:12px; padding:14px 18px; border:1px solid #DDE3EC; }
+.stat { background:#fff; border-radius:12px; padding:14px 18px; border:1px solid #DDE3EC; color:#1B2433; }
 .stat b { font-size: 1.6rem; display:block; line-height:1.1; }
 .stat span { color:#5B6675; font-size:.9rem; }
-.trail { background:#fff; border-radius:10px; padding:12px 14px; margin-bottom:10px;
+.trail { background:#fff; border-radius:10px; padding:12px 14px; margin-bottom:10px; color:#1B2433;
          border:1px solid #DDE3EC; border-left:5px solid #9AA5B4; font-size:.92rem; line-height:1.45; }
 .trail.worked { border-left-color:#1E9E63; } .trail.failed { border-left-color:#D6402F; }
 .badge { display:inline-block; padding:2px 10px; border-radius:99px; font-size:.78rem;
@@ -57,7 +60,7 @@ h1 { font-weight: 700; letter-spacing: -0.02em; margin-bottom: 0; }
 .badge.worked { background:#DDF3E8; color:#137548; } .badge.failed { background:#FBE1DD; color:#A32A1C; }
 .pill { display:inline-block; padding:3px 12px; border-radius:99px; font-size:.82rem; font-weight:600; }
 .pill.on { background:#DCE6FD; color:#2143B0; } .pill.off { background:#E6EAF0; color:#44505F; }
-.empty { color:#5B6675; padding:14px; border:1px dashed #B9C2CF; border-radius:10px; }
+.empty { color:#5B6675; padding:14px; border:1px dashed #B9C2CF; border-radius:10px; background:#fff; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -81,11 +84,10 @@ def trail(memories):
         return
     for m in memories:
         t = m.upper()
-        cls = "failed" if "OUTCOME: FAILED" in t or "FAILED" in t else "worked" if "OUTCOME: WORKED" in t or "WORKED" in t else ""
+        cls = "failed" if "FAILED" in t else "worked" if "WORKED" in t else ""
         label = {"failed": "Fix failed", "worked": "Fix worked"}.get(cls, "Related memory")
         st.markdown(f'<div class="trail {cls}"><span class="badge {cls}">{label}</span><br>{html.escape(m)}</div>', unsafe_allow_html=True)
 
-# ---------- Sidebar ----------
 with st.sidebar:
     st.header("Settings")
     use_memory = st.toggle("Use team memory", value=True,
@@ -94,7 +96,6 @@ with st.sidebar:
     st.divider()
     st.caption("Memory: Hindsight · Model: Groq")
 
-# ---------- Header ----------
 st.title("🧠 On-Call Memory Agent")
 st.markdown('<p class="sub">Paste an incident. The agent recalls how your team fixed it before, and learns from every outcome.</p>', unsafe_allow_html=True)
 c1, c2, c3 = st.columns(3)
@@ -105,7 +106,6 @@ st.write("")
 
 tab1, tab2, tab3 = st.tabs(["Diagnose", "Memory explorer", "Recurring patterns"])
 
-# ---------- Diagnose ----------
 with tab1:
     left, right = st.columns([3, 2], gap="large")
     with left:
@@ -162,7 +162,6 @@ with tab1:
         st.caption("Past incidents the agent used for this diagnosis.")
         trail(st.session_state.get("memories", []))
 
-# ---------- Memory explorer ----------
 with tab2:
     st.markdown("Search everything the agent knows.")
     q = st.text_input("Search", value="past incidents and their fixes", label_visibility="collapsed")
@@ -175,7 +174,6 @@ with tab2:
             except Exception as e:
                 st.error(f"Search failed: {e}")
 
-# ---------- Patterns ----------
 with tab3:
     st.markdown("Ask the agent to look across every incident and find what keeps going wrong.")
     if st.button("Find recurring patterns", type="primary"):
